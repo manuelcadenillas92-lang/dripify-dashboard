@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dripify × LinkedIn — Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{--bg:#080c10;--surface:#0d1117;--surface2:#131920;--border:#1e2a38;--accent:#00c2ff;--accent2:#0077b5;--text:#e8edf2;--muted:#5a6a7a;--green:#00e676;--warn:#ffb347;--danger:#ff4d6a}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-size:14px;min-height:100vh;overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,194,255,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(0,194,255,.025) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0}
+.wrapper{position:relative;z-index:1;max-width:1200px;margin:0 auto;padding:28px 24px 64px}
+header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:14px}
+.brand{display:flex;align-items:center;gap:12px}
+.brand-icon{width:38px;height:38px;background:linear-gradient(135deg,var(--accent2),var(--accent));border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;cursor:pointer;flex-shrink:0;transition:transform .15s,box-shadow .15s;position:relative}
+.brand-icon:hover{transform:scale(1.08);box-shadow:0 0 14px rgba(0,194,255,.3)}
+.edit-hint{position:absolute;bottom:-18px;left:50%;transform:translateX(-50%);font-size:9px;font-family:'DM Mono',monospace;color:var(--muted);white-space:nowrap;opacity:0;transition:opacity .2s;pointer-events:none}
+.brand-icon:hover .edit-hint{opacity:1}
+.brand-text h1{font-family:'Syne',sans-serif;font-size:18px;font-weight:700;letter-spacing:-.5px;cursor:text;outline:none;border-bottom:1px dashed transparent;transition:border-color .2s;display:inline-block}
+.brand-text h1:hover{border-bottom-color:rgba(0,194,255,.3)}
+.brand-text h1:focus{border-bottom-color:var(--accent);background:rgba(0,194,255,.05);border-radius:3px;padding:0 4px}
+.brand-text p{font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:.5px;margin-top:3px;cursor:text;outline:none;border-bottom:1px dashed transparent;transition:border-color .2s;display:inline-block}
+.brand-text p:hover{border-bottom-color:rgba(255,255,255,.15)}
+.brand-text p:focus{border-bottom-color:var(--muted)}
+.header-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.badge{font-family:'DM Mono',monospace;font-size:11px;padding:4px 12px;border-radius:20px;letter-spacing:.3px}
+.badge-period{color:var(--accent);background:rgba(0,194,255,.08);border:1px solid rgba(0,194,255,.2)}
+.badge-live{color:var(--green);background:rgba(0,230,118,.08);border:1px solid rgba(0,230,118,.2);display:none}
+.badge-live.show{display:inline-block}
+.dot-live{display:inline-block;width:6px;height:6px;background:var(--green);border-radius:50%;margin-right:5px;animation:pulse 2s infinite}
+.status-bar{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 16px;margin-bottom:20px;flex-wrap:wrap}
+.status-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.status-dot.ok{background:var(--green);animation:pulse 2s infinite}
+.status-dot.loading{background:var(--warn);animation:pulse .8s infinite}
+.status-dot.err{background:var(--danger)}
+.status-text{font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);flex:1}
+.status-btn{font-family:'DM Mono',monospace;font-size:11px;color:var(--danger);cursor:pointer;background:none;border:1px solid rgba(255,77,106,.3);padding:3px 10px;border-radius:6px}
+.status-btn:hover{background:rgba(255,77,106,.08)}
+#drop-zone{border:2px dashed var(--border);border-radius:14px;padding:24px;text-align:center;cursor:pointer;transition:all .25s;background:var(--surface);margin-bottom:22px;position:relative;overflow:hidden}
+#drop-zone::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 50% 0%,rgba(0,194,255,.06) 0%,transparent 70%);pointer-events:none}
+#drop-zone:hover,#drop-zone.dragover{border-color:var(--accent);background:rgba(0,194,255,.04)}
+.upload-icon{font-size:28px;margin-bottom:8px;display:block}
+.upload-title{font-family:'Syne',sans-serif;font-size:14px;font-weight:600;margin-bottom:4px}
+.upload-sub{color:var(--muted);font-size:11px;font-family:'DM Mono',monospace;margin-bottom:14px}
+.btn-upload{display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,var(--accent2),var(--accent));color:#fff;border:none;padding:8px 20px;border-radius:8px;font-family:'Syne',sans-serif;font-weight:600;font-size:13px;cursor:pointer;transition:opacity .2s}
+.btn-upload:hover{opacity:.85}
+#file-input{display:none}
+.section-label{font-family:'DM Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:2px;color:var(--muted);margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.section-label::after{content:'';flex:1;height:1px;background:var(--border)}
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:12px;margin-bottom:24px}
+.kpi-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px 16px;position:relative;overflow:hidden;transition:border-color .2s,transform .2s}
+.kpi-card:hover{border-color:rgba(0,194,255,.3);transform:translateY(-2px)}
+.kpi-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--kc,var(--accent));opacity:.7}
+.kpi-label{font-size:10px;color:var(--muted);font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
+.kpi-value{font-family:'Syne',sans-serif;font-size:32px;font-weight:800;color:var(--kc,var(--text));line-height:1;margin-bottom:5px}
+.kpi-sub{font-size:11px;color:var(--muted)}
+.charts-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px}
+@media(max-width:680px){.charts-row{grid-template-columns:1fr}}
+.chart-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px}
+.chart-title{font-family:'Syne',sans-serif;font-size:11px;font-weight:600;margin-bottom:16px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px}
+.bar-row{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.bar-lbl{width:54px;font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);text-align:right;flex-shrink:0}
+.bar-track{flex:1;height:20px;background:rgba(255,255,255,.04);border-radius:3px;overflow:hidden}
+.bar-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,#0077b5,#00c2ff);transition:width .9s cubic-bezier(.16,1,.3,1)}
+.bar-num{width:24px;font-family:'DM Mono',monospace;font-size:11px;color:var(--text);flex-shrink:0}
+.funnel-step{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.funnel-lbl{width:100px;font-size:10px;color:var(--muted);font-family:'DM Mono',monospace;text-align:right;flex-shrink:0}
+.funnel-wrap{flex:1;height:28px;display:flex;align-items:center}
+.funnel-inner{height:100%;border-radius:0 4px 4px 0;display:flex;align-items:center;padding-left:10px;font-size:12px;font-weight:600;min-width:30px;transition:width .9s cubic-bezier(.16,1,.3,1)}
+.funnel-pct{width:38px;font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);text-align:right;flex-shrink:0}
+.table-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;overflow-x:auto;margin-bottom:24px}
+table{width:100%;border-collapse:collapse;font-size:12px}
+thead th{font-family:'DM Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);text-align:right;padding:7px 10px;border-bottom:1px solid var(--border);white-space:nowrap}
+thead th:first-child{text-align:left}
+tbody tr{border-bottom:1px solid rgba(255,255,255,.04);transition:background .15s}
+tbody tr:hover{background:rgba(0,194,255,.04)}
+tbody tr:last-child{border-bottom:none;font-weight:600}
+tbody td{padding:9px 10px;text-align:right;font-family:'DM Mono',monospace}
+tbody td:first-child{text-align:left;font-family:'Inter',sans-serif;font-size:13px;color:var(--text)}
+.cell-zero{color:var(--muted)!important}
+.cell-mid{color:var(--accent)!important}
+.cell-hi{color:var(--green)!important}
+.history-bar{display:flex;align-items:center;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+.history-lbl{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;flex-shrink:0}
+.history-btn{font-family:'DM Mono',monospace;font-size:11px;padding:5px 12px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all .15s}
+.history-btn:hover{border-color:var(--accent);color:var(--accent)}
+.history-btn.active{border-color:var(--accent);color:var(--accent);background:rgba(0,194,255,.08)}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(4px);z-index:100;display:flex;align-items:center;justify-content:center}
+.modal-box{background:var(--surface2);border:1px solid var(--border);border-radius:16px;padding:24px;width:320px;max-width:90vw;box-shadow:0 24px 64px rgba(0,0,0,.6)}
+.modal-title{font-family:'Syne',sans-serif;font-size:14px;font-weight:700;margin-bottom:16px}
+.emoji-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-bottom:16px}
+.emoji-btn{background:var(--surface);border:1px solid var(--border);border-radius:7px;font-size:18px;cursor:pointer;padding:6px 2px;text-align:center;transition:all .15s;line-height:1}
+.emoji-btn:hover,.emoji-btn.sel{border-color:var(--accent);background:rgba(0,194,255,.1)}
+.modal-row{display:flex;gap:8px;align-items:center;margin-bottom:16px}
+.modal-input{flex:1;background:var(--surface);border:1px solid var(--border);border-radius:7px;padding:8px 10px;color:var(--text);font-family:'DM Mono',monospace;font-size:12px;outline:none}
+.modal-input:focus{border-color:var(--accent)}
+.preview-box{width:36px;height:36px;background:linear-gradient(135deg,var(--accent2),var(--accent));border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end}
+.btn-m{padding:7px 16px;border-radius:7px;font-family:'Syne',sans-serif;font-size:12px;font-weight:600;cursor:pointer;border:1px solid var(--border);background:transparent;color:var(--muted);transition:all .15s}
+.btn-m:hover{color:var(--text)}
+.btn-mc{background:linear-gradient(135deg,var(--accent2),var(--accent));border:none;color:#fff}
+.btn-mc:hover{opacity:.85}
+.footer{text-align:center;font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);margin-top:40px;letter-spacing:1px}
+.pulse-dot{display:inline-block;width:7px;height:7px;background:var(--green);border-radius:50%;margin-right:6px;animation:pulse 2s infinite}
+#dashboard{display:none}
+.toast{position:fixed;bottom:24px;right:24px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px 18px;font-family:'DM Mono',monospace;font-size:12px;color:var(--text);z-index:200;transition:all .3s;transform:translateY(80px);opacity:0;max-width:320px}
+.toast.show{transform:translateY(0);opacity:1}
+.toast.ok{border-color:rgba(0,230,118,.3);color:var(--green)}
+.toast.err{border-color:rgba(255,77,106,.3);color:var(--danger)}
+.sql-box{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:16px;margin-top:16px;font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);line-height:1.7;white-space:pre-wrap;display:none}
+.sql-box.show{display:block}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+@keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.fade-in{animation:fadeIn .4s ease both}
+</style>
+</head>
+<body>
+<div class="wrapper">
+
+<header>
+  <div class="brand">
+    <div class="brand-icon" id="iconBtn">
+      <span id="iconEmoji">📊</span>
+      <span class="edit-hint">cambiar ícono</span>
+    </div>
+    <div class="brand-text">
+      <h1 contenteditable="true" spellcheck="false" id="dashTitle">Dripify × LinkedIn</h1>
+      <p contenteditable="true" spellcheck="false" id="dashSub">Rendimiento de Campañas · Flexi.cx</p>
+    </div>
+  </div>
+  <div class="header-right">
+    <span class="badge badge-period" id="periodBadge">Conectando...</span>
+    <span class="badge badge-live" id="liveBadge"><span class="dot-live"></span>En vivo</span>
+  </div>
+</header>
+
+<div class="status-bar">
+  <div class="status-dot loading" id="statusDot"></div>
+  <span class="status-text" id="statusText">Conectando con Supabase...</span>
+  <button class="status-btn" id="clearBtn" style="display:none" onclick="clearAllData()">🗑 Limpiar todos los datos</button>
+</div>
+
+<!-- SQL instructions (hidden until needed) -->
+<div class="sql-box" id="sqlBox">-- 1. Ve a Supabase → SQL Editor → New query
+-- 2. Pega y ejecuta este SQL:
+
+CREATE TABLE IF NOT EXISTS dripify_campaigns (
+  id bigserial primary key,
+  period_id text not null,
+  date_raw text,
+  invites_sent int default 0,
+  invites_accepted int default 0,
+  messaged int default 0,
+  inmailed int default 0,
+  leads_replied int default 0,
+  emails_sent int default 0,
+  liked int default 0,
+  profiles_viewed int default 0,
+  is_total boolean default false,
+  created_at timestamptz default now()
+);
+
+ALTER TABLE dripify_campaigns ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "allow_select" ON dripify_campaigns FOR SELECT USING (true);
+CREATE POLICY "allow_insert" ON dripify_campaigns FOR INSERT WITH CHECK (true);
+CREATE POLICY "allow_delete" ON dripify_campaigns FOR DELETE USING (true);
+
+-- 3. Haz clic en RUN y luego recarga esta página.</div>
+
+<div id="drop-zone" onclick="document.getElementById('file-input').click()">
+  <span class="upload-icon">📊</span>
+  <p class="upload-title" id="uploadTitle">Arrastra tu CSV de Dripify aquí</p>
+  <p class="upload-sub">Los datos se guardan en Supabase · Todos ven el mismo reporte en tiempo real</p>
+  <button class="btn-upload" onclick="event.stopPropagation();document.getElementById('file-input').click()">↑ Seleccionar CSV</button>
+  <input type="file" id="file-input" accept=".csv">
+</div>
+
+<div id="dashboard">
+  <div class="section-label">Períodos disponibles</div>
+  <div class="history-bar" id="historyBar"><span class="history-lbl">Período:</span></div>
+
+  <div class="section-label">Resumen del período</div>
+  <div class="kpi-grid" id="kpiGrid"></div>
+
+  <div class="section-label">Actividad diaria</div>
+  <div class="charts-row">
+    <div class="chart-card">
+      <div class="chart-title">Mensajes por día</div>
+      <div id="barChart"></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Embudo de conversión</div>
+      <div id="funnelChart"></div>
+    </div>
+  </div>
+
+  <div class="section-label">Detalle diario</div>
+  <div class="table-card">
+    <table id="dataTable"><thead></thead><tbody></tbody></table>
+  </div>
+</div>
+
+<div class="footer"><span class="pulse-dot"></span>FLEXI.CX · OUTBOUND INTELLIGENCE · DATOS EN TIEMPO REAL · SUPABASE</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="modal-overlay" id="iconModal" style="display:none">
+  <div class="modal-box">
+    <div class="modal-title">✏️ Cambiar ícono</div>
+    <div class="emoji-grid" id="emojiGrid"></div>
+    <div class="modal-row">
+      <input class="modal-input" id="customEmoji" maxlength="4" placeholder="O escribe un emoji…">
+      <div class="preview-box" id="emojiPreview">📊</div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-m" onclick="document.getElementById('iconModal').style.display='none'">Cancelar</button>
+      <button class="btn-m btn-mc" onclick="applyIcon()">Aplicar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://wtnrktumutivjbgvyqgk.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind0bnJrdHVtdXRpdmpiZ3Z5cWdrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY3ODQ0MzQsImV4cCI6MjA5MjM2MDQzNH0.NPjf4g24GA_uCTvZapAyUfdcwB-8xJSemp1rKPVE3DIk';
+const TABLE = 'dripify_campaigns';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let allPeriods = [], activePeriod = null, selectedEmoji = '📊';
+
+function toast(msg, type='ok') {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = `toast ${type} show`;
+  setTimeout(() => t.classList.remove('show'), 3500);
+}
+function setStatus(txt, state='ok') {
+  document.getElementById('statusText').textContent = txt;
+  document.getElementById('statusDot').className = 'status-dot ' + state;
+}
+
+// ── INIT ──
+async function init() {
+  const { error } = await sb.from(TABLE).select('id').limit(1);
+  if (error) {
+    if (error.code === '42P01' || error.message.includes('does not exist')) {
+      setStatus('La tabla no existe aún — sigue las instrucciones abajo', 'err');
+      document.getElementById('periodBadge').textContent = 'Setup requerido';
+      document.getElementById('sqlBox').classList.add('show');
+      return;
+    }
+    setStatus('Error de conexión: ' + error.message, 'err');
+    return;
+  }
+  await loadPeriods();
+  subscribeRealtime();
+}
+
+async function loadPeriods() {
+  setStatus('Cargando datos...', 'loading');
+  const { data, error } = await sb.from(TABLE).select('period_id,created_at').order('created_at', { ascending: false });
+  if (error) { setStatus('Error: ' + error.message, 'err'); return; }
+
+  const seen = new Set();
+  allPeriods = [];
+  (data||[]).forEach(r => { if (!seen.has(r.period_id)) { seen.add(r.period_id); allPeriods.push(r.period_id); } });
+
+  renderHistoryBar();
+
+  if (allPeriods.length > 0) {
+    if (!activePeriod || !allPeriods.includes(activePeriod)) activePeriod = allPeriods[0];
+    await loadPeriodData(activePeriod);
+    document.getElementById('clearBtn').style.display = 'inline-block';
+    document.getElementById('liveBadge').classList.add('show');
+    setStatus(`Conectado · ${allPeriods.length} período${allPeriods.length>1?'s':''} en la nube`, 'ok');
+    document.getElementById('uploadTitle').textContent = '↻ Subir nuevo período · Arrastra un CSV de Dripify';
+  } else {
+    setStatus('Conectado a Supabase · Sin datos aún — carga tu primer CSV', 'ok');
+    document.getElementById('periodBadge').textContent = 'Sin datos';
+    document.getElementById('liveBadge').classList.add('show');
+  }
+}
+
+async function loadPeriodData(pid) {
+  const { data, error } = await sb.from(TABLE).select('*').eq('period_id', pid).order('created_at', { ascending: true });
+  if (error) { toast('Error cargando período', 'err'); return; }
+  renderDashboard(data||[]);
+  document.getElementById('dashboard').style.display = 'block';
+  document.getElementById('sqlBox').classList.remove('show');
+}
+
+// ── CSV PARSER ──
+function parseCSV(txt) {
+  const lines = txt.trim().split('\n').map(l=>l.trim()).filter(Boolean);
+  const header = lines[0].split(',').map(h=>h.replace(/"/g,'').trim());
+  return lines.slice(1).map(raw => {
+    const vals=[]; let cur='',inQ=false;
+    for(const c of raw){if(c==='"'){inQ=!inQ;continue}if(c===','&&!inQ){vals.push(cur.trim());cur='';continue}cur+=c}
+    vals.push(cur.trim());
+    const row={}; header.forEach((h,i)=>row[h]=vals[i]??''); return row;
+  });
+}
+
+function makePeriodId(rows) {
+  const data = rows.filter(r=>!(r['Date']||'').toLowerCase().includes('total'));
+  const dates = data.map(r=>r['Date']).filter(Boolean);
+  return dates.length ? `${dates[0]} – ${dates[dates.length-1]}` : `import-${Date.now()}`;
+}
+
+async function uploadCSV(rows) {
+  setStatus('Guardando en Supabase...', 'loading');
+  const pid = makePeriodId(rows);
+  const data = rows.filter(r=>!(r['Date']||'').toLowerCase().includes('total'));
+  const tot  = rows.find(r=>(r['Date']||'').toLowerCase().includes('total'));
+
+  await sb.from(TABLE).delete().eq('period_id', pid);
+
+  const records = data.map(r=>({
+    period_id: pid, date_raw: r['Date']||'',
+    invites_sent: parseInt(r['Invites sent'])||0,
+    invites_accepted: parseInt(r['Invites accepted'])||0,
+    messaged: parseInt(r['Messaged'])||0,
+    inmailed: parseInt(r['InMailed'])||0,
+    leads_replied: parseInt(r['Leads replied'])||0,
+    emails_sent: parseInt(r['Emails sent'])||0,
+    liked: parseInt(r['Liked'])||0,
+    profiles_viewed: parseInt(r['Profiles viewed'])||0,
+    is_total: false
+  }));
+  if (tot) records.push({
+    period_id: pid, date_raw: 'Total:',
+    invites_sent: parseInt(tot['Invites sent'])||0,
+    invites_accepted: parseInt(tot['Invites accepted'])||0,
+    messaged: parseInt(tot['Messaged'])||0,
+    inmailed: parseInt(tot['InMailed'])||0,
+    leads_replied: parseInt(tot['Leads replied'])||0,
+    emails_sent: parseInt(tot['Emails sent'])||0,
+    liked: parseInt(tot['Liked'])||0,
+    profiles_viewed: parseInt(tot['Profiles viewed'])||0,
+    is_total: true
+  });
+
+  const { error } = await sb.from(TABLE).insert(records);
+  if (error) {
+    setStatus('Error guardando: ' + error.message, 'err');
+    toast('Error al guardar en Supabase', 'err');
+    if (error.code === '42P01') document.getElementById('sqlBox').classList.add('show');
+    return;
+  }
+  activePeriod = pid;
+  toast(`✓ "${pid}" guardado en la nube`, 'ok');
+  await loadPeriods();
+}
+
+async function clearAllData() {
+  if (!confirm('¿Borrar TODOS los datos? Esto afecta a todos los usuarios que ven el dashboard.')) return;
+  setStatus('Eliminando...', 'loading');
+  const { error } = await sb.from(TABLE).delete().neq('id', 0);
+  if (error) { toast('Error: ' + error.message, 'err'); return; }
+  allPeriods=[]; activePeriod=null;
+  document.getElementById('dashboard').style.display='none';
+  document.getElementById('clearBtn').style.display='none';
+  document.getElementById('liveBadge').classList.remove('show');
+  document.getElementById('historyBar').innerHTML='<span class="history-lbl">Período:</span>';
+  document.getElementById('periodBadge').textContent='Sin datos';
+  document.getElementById('uploadTitle').textContent='Arrastra tu CSV de Dripify aquí';
+  setStatus('Datos eliminados · Carga un nuevo CSV para comenzar', 'ok');
+  toast('Todos los datos eliminados', 'ok');
+}
+
+// ── HISTORY BAR ──
+function renderHistoryBar() {
+  const bar = document.getElementById('historyBar');
+  bar.innerHTML = '<span class="history-lbl">Período:</span>';
+  allPeriods.forEach(p => {
+    const btn = document.createElement('button');
+    btn.className = 'history-btn' + (p===activePeriod?' active':'');
+    btn.textContent = p;
+    btn.onclick = async () => {
+      activePeriod=p;
+      document.querySelectorAll('.history-btn').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      await loadPeriodData(p);
+    };
+    bar.appendChild(btn);
+  });
+}
+
+// ── RENDER ──
+const KPI_CFG = [
+  {key:'invites_sent',    label:'Invites enviados',  color:'#378add'},
+  {key:'invites_accepted',label:'Invites aceptados', color:'#1D9E75'},
+  {key:'messaged',        label:'Mensajes enviados', color:'#00c2ff'},
+  {key:'leads_replied',   label:'Leads respondidos', color:'#639922'},
+  {key:'liked',           label:'Likes dados',       color:'#BA7517'},
+];
+const COL_ES = {date_raw:'Fecha',invites_sent:'Invites env.',invites_accepted:'Aceptados',messaged:'Mensajes',leads_replied:'Respondidos',liked:'Likes'};
+const VIS_COLS = ['date_raw','invites_sent','invites_accepted','messaged','leads_replied','liked'];
+
+function renderDashboard(rows) {
+  const data = rows.filter(r=>!r.is_total);
+  const tot  = rows.find(r=>r.is_total);
+  const getVal = k => tot?(tot[k]||0):data.reduce((s,r)=>s+(r[k]||0),0);
+
+  const dates = data.map(r=>r.date_raw).filter(Boolean);
+  if (dates.length) document.getElementById('periodBadge').textContent=`📅 ${dates[0]} – ${dates[dates.length-1]}`;
+
+  // KPIs
+  const kg=document.getElementById('kpiGrid'); kg.innerHTML='';
+  KPI_CFG.forEach(cfg=>{
+    const v=getVal(cfg.key);
+    let sub='';
+    if(cfg.key==='invites_accepted'){const s=getVal('invites_sent');sub=s?`${Math.round((v/s)*100)}% aceptación`:'—';}
+    else if(cfg.key==='leads_replied'){const m=getVal('messaged');sub=m?`${Math.round((v/m)*100)}% reply rate`:'—';}
+    else{const d=data.filter(r=>(r[cfg.key]||0)>0).length;sub=d?`activo ${d} día${d>1?'s':''}`:'sin actividad';}
+    const c=document.createElement('div');c.className='kpi-card fade-in';
+    c.style.setProperty('--kc',cfg.color);
+    c.innerHTML=`<div class="kpi-label">${cfg.label}</div><div class="kpi-value">${v}</div><div class="kpi-sub">${sub}</div>`;
+    kg.appendChild(c);
+  });
+  const iS=getVal('invites_sent'),iA=getVal('invites_accepted'),msg=getVal('messaged'),rep=getVal('leads_replied');
+  [{label:'Conv. Invites',val:iS?`${Math.round((iA/iS)*100)}%`:'—',sub:`${iA} de ${iS}`,color:'#D85A30'},
+   {label:'Reply Rate',   val:msg?`${Math.round((rep/msg)*100)}%`:'—',sub:`${rep} de ${msg}`,color:'#E24B4A'}
+  ].forEach(x=>{
+    const c=document.createElement('div');c.className='kpi-card fade-in';
+    c.style.setProperty('--kc',x.color);
+    c.innerHTML=`<div class="kpi-label">${x.label}</div><div class="kpi-value">${x.val}</div><div class="kpi-sub">${x.sub}</div>`;
+    kg.appendChild(c);
+  });
+
+  // Bar
+  const bc=document.getElementById('barChart');bc.innerHTML='';
+  const mMax=Math.max(...data.map(r=>r.messaged||0),1);
+  data.forEach(r=>{
+    const m=r.messaged||0;
+    const lbl=(r.date_raw||'').replace(/, 202\d/,'');
+    const d=document.createElement('div');d.className='bar-row';
+    d.innerHTML=`<span class="bar-lbl">${lbl}</span><div class="bar-track"><div class="bar-fill" style="width:${Math.round((m/mMax)*100)}%"></div></div><span class="bar-num">${m}</span>`;
+    bc.appendChild(d);
+  });
+
+  // Funnel
+  const fc=document.getElementById('funnelChart');fc.innerHTML='';
+  const fItems=[
+    {label:'Invites env.',key:'invites_sent',    color:'#378add'},
+    {label:'Aceptados',   key:'invites_accepted',color:'#1D9E75'},
+    {label:'Mensajes',    key:'messaged',        color:'#00c2ff'},
+    {label:'Respondidos', key:'leads_replied',   color:'#639922'},
+  ];
+  const fVals=fItems.map(f=>({...f,val:getVal(f.key)}));
+  const fMax=Math.max(...fVals.map(f=>f.val),1);
+  fVals.forEach((f,i)=>{
+    const pct=Math.round((f.val/fMax)*100);
+    const conv=i===0?'100%':fVals[0].val?`${Math.round((f.val/fVals[0].val)*100)}%`:'0%';
+    const d=document.createElement('div');d.className='funnel-step';
+    d.innerHTML=`<span class="funnel-lbl">${f.label}</span><div class="funnel-wrap"><div class="funnel-inner" style="width:${pct}%;background:${f.color}22;border-left:2px solid ${f.color};color:${f.color}">${f.val}</div></div><span class="funnel-pct">${conv}</span>`;
+    fc.appendChild(d);
+  });
+
+  // Table
+  const thead=document.querySelector('#dataTable thead');
+  const tbody=document.querySelector('#dataTable tbody');
+  thead.innerHTML='';tbody.innerHTML='';
+  const tr=document.createElement('tr');
+  VIS_COLS.forEach(c=>{const th=document.createElement('th');th.textContent=COL_ES[c]||c;tr.appendChild(th);});
+  thead.appendChild(tr);
+  [...data,...(tot?[tot]:[])].forEach(r=>{
+    const row=document.createElement('tr');
+    VIS_COLS.forEach(c=>{
+      const td=document.createElement('td');
+      if(c==='date_raw'){td.textContent=r.is_total?'TOTAL':(r[c]||'').replace(/, 202\d/,'');}
+      else{const n=r[c]||0;td.textContent=n;td.className=n===0?'cell-zero':n>=5?'cell-hi':'cell-mid';}
+      row.appendChild(td);
+    });
+    tbody.appendChild(row);
+  });
+  document.getElementById('dashboard').style.display='block';
+}
+
+// ── REALTIME ──
+function subscribeRealtime() {
+  sb.channel('dripify').on('postgres_changes',{event:'*',schema:'public',table:TABLE},async()=>{
+    await loadPeriods();
+  }).subscribe();
+}
+
+// ── FILES ──
+async function processFile(file) {
+  const reader=new FileReader();
+  reader.onload=async ev=>{const rows=parseCSV(ev.target.result);await uploadCSV(rows);};
+  reader.readAsText(file,'UTF-8');
+}
+document.getElementById('file-input').addEventListener('change',e=>{const f=e.target.files[0];if(!f)return;processFile(f);e.target.value='';});
+const dz=document.getElementById('drop-zone');
+dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('dragover')});
+dz.addEventListener('dragleave',()=>dz.classList.remove('dragover'));
+dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('dragover');const f=e.dataTransfer.files[0];if(f)processFile(f);});
+
+// ── ICON ──
+const EMOJIS=['📊','📈','📉','🎯','🚀','💡','🔥','⚡','🌐','💼','🤝','📣','📬','🧲','💬','👥','🏆','✅','🔗','📋','🧩','🛠️','📡','🦾','🤖','💎','🌟','🎖️','⭐','🔍'];
+const eg=document.getElementById('emojiGrid');
+EMOJIS.forEach(em=>{
+  const b=document.createElement('button');b.className='emoji-btn';b.textContent=em;
+  if(em===selectedEmoji)b.classList.add('sel');
+  b.addEventListener('click',()=>{document.querySelectorAll('.emoji-btn').forEach(x=>x.classList.remove('sel'));b.classList.add('sel');selectedEmoji=em;document.getElementById('customEmoji').value='';document.getElementById('emojiPreview').textContent=em;});
+  eg.appendChild(b);
+});
+document.getElementById('customEmoji').addEventListener('input',e=>{const v=e.target.value.trim();if(v){selectedEmoji=v;document.getElementById('emojiPreview').textContent=v;document.querySelectorAll('.emoji-btn').forEach(x=>x.classList.remove('sel'));}});
+document.getElementById('iconBtn').addEventListener('click',()=>document.getElementById('iconModal').style.display='flex');
+document.getElementById('iconModal').addEventListener('click',e=>{if(e.target===document.getElementById('iconModal'))document.getElementById('iconModal').style.display='none';});
+function applyIcon(){const v=document.getElementById('customEmoji').value.trim()||selectedEmoji||'📊';document.getElementById('iconEmoji').textContent=v;document.getElementById('iconModal').style.display='none';}
+
+init();
+</script>
+</body>
+</html>
